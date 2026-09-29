@@ -155,16 +155,52 @@ async function exportWord() {
     const response = await fetch("public/templates/unit-plan-template.docx"); if (!response.ok) throw new Error("Wordテンプレートを読み込めませんでした。");
     const data = UNITS[model.subject][model.unit];
     const files = await readZip(await response.arrayBuffer());
-    let xml = new TextDecoder().decode(files["word/document.xml"]);
+    let xml = normalizeTemplateTags(new TextDecoder().decode(files["word/document.xml"]));
     const values = { affiliation: model.affiliation, teacherName: model.teacherName, unit: `${model.subject}　${model.unit}`, goal1: data.goals[0], goal2: data.goals[1], goal3: data.goals[2], criteriaKnowledge: data.criteria[0], criteriaThinking: data.criteria[1], criteriaAttitude: data.criteria[2] };
-    const loopRow = xml.match(/<w:tr(?:\s[^>]*)?>[\s\S]*?\{#lessons\}[\s\S]*?\{\/lessons\}[\s\S]*?<\/w:tr>/);
+    const tableRows = xml.match(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g) || [];
+    const loopRow = tableRows.find(row => row.includes("{#lessons}") && row.includes("{/lessons}"));
     if (!loopRow) throw new Error("テンプレートの授業行タグが見つかりません。");
-    const rows = model.lessons.map(lesson => replaceTags(loopRow[0].replace("{#lessons}", "").replace("{/lessons}", ""), { ...lesson, hour: `${lesson.hour}時間目` })).join("");
-    xml = replaceTags(xml.replace(loopRow[0], rows), values);
+    const lessonRow = loopRow.replace("{#lessons}", "").replace("{/lessons}", "");
+    const rows = model.lessons.map(lesson => replaceTags(lessonRow, { ...lesson, hour: `${lesson.hour}時間目` })).join("");
+    xml = replaceTags(xml.replace(loopRow, rows), values);
     files["word/document.xml"] = new TextEncoder().encode(xml);
     downloadBlob(buildZip(files), `${model.subject}_${model.unit}_指導と評価の計画.docx`);
   } catch (error) { alert(error.message || "Word出力に失敗しました。"); }
   finally { button.disabled = false; button.querySelector("span").textContent = "Word形式で出力"; }
+}
+const TEMPLATE_TAGS = ["#lessons", "/lessons", "hour", "activity", "knowledge", "thinking", "attitude", "method", "affiliation", "teacherName", "unit", "goal1", "goal2", "goal3", "criteriaKnowledge", "criteriaThinking", "criteriaAttitude"].map(tag => `{${tag}}`);
+function normalizeTemplateTags(xml) {
+  return xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
+    const textPattern = /(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g;
+    const nodes = [...paragraph.matchAll(textPattern)].map(match => ({ open: match[1], text: match[2], close: match[3] }));
+    if (nodes.length < 2) return paragraph;
+    for (const tag of TEMPLATE_TAGS) {
+      let joined = nodes.map(node => node.text).join("");
+      let start = joined.indexOf(tag);
+      while (start !== -1) {
+        const end = start + tag.length;
+        let cursor = 0; let startNode = -1; let endNode = -1; let startOffset = 0; let endOffset = 0;
+        nodes.forEach((node, index) => {
+          const next = cursor + node.text.length;
+          if (startNode === -1 && start >= cursor && start < next) { startNode = index; startOffset = start - cursor; }
+          if (endNode === -1 && end > cursor && end <= next) { endNode = index; endOffset = end - cursor; }
+          cursor = next;
+        });
+        if (startNode === -1 || endNode === -1 || startNode === endNode) break;
+        const suffix = nodes[endNode].text.slice(endOffset);
+        nodes[startNode].text = nodes[startNode].text.slice(0, startOffset) + tag;
+        for (let index = startNode + 1; index < endNode; index++) nodes[index].text = "";
+        nodes[endNode].text = suffix;
+        joined = nodes.map(node => node.text).join("");
+        start = joined.indexOf(tag, start + tag.length);
+      }
+    }
+    let index = 0;
+    return paragraph.replace(textPattern, () => {
+      const node = nodes[index++];
+      return node.open + node.text + node.close;
+    });
+  });
 }
 function replaceTags(xml, values) {
   return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, escapeXml(String(value ?? ""))), xml);
