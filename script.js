@@ -242,12 +242,12 @@ function downloadBlob(blob, name) {
   const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function init() {
-  fillSelect($("#subject"), SUBJECTS, "数学Ⅰ", true); fillSelect($("#criteriaSubject"), SUBJECTS, "数学Ⅰ", true);
+  fillSelect($("#subject"), SUBJECTS, "数学Ⅰ"); fillSelect($("#criteriaSubject"), SUBJECTS, "数学Ⅰ");
   fillSelect($("#unit"), Object.keys(UNITS["数学Ⅰ"]), "数と式"); fillSelect($("#criteriaUnit"), Object.keys(UNITS["数学Ⅰ"]), "数と式");
   switchUnit(); renderCriteria(); renderAnnual();
   document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => { document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === tab)); document.querySelectorAll(".panel").forEach(x => { x.hidden = x.id !== tab.dataset.tab; x.classList.toggle("active", x.id === tab.dataset.tab); }); }));
   $("#subject").addEventListener("change", changeContext); $("#unit").addEventListener("change", () => { saveModel(); switchUnit(); });
-  $("#criteriaSubject").addEventListener("change", renderCriteria); $("#criteriaUnit").addEventListener("change", renderCriteria);
+  $("#criteriaSubject").addEventListener("change", () => { const subject = $("#criteriaSubject").value; const units = Object.keys(UNITS[subject] || {}); fillSelect($("#criteriaUnit"), units.length ? units : ["準備中"], units[0] || "準備中"); renderCriteria(); }); $("#criteriaUnit").addEventListener("change", renderCriteria);
   ["#affiliation", "#teacherName"].forEach(id => $(id).addEventListener("input", saveModel)); $("#hours").addEventListener("change", e => resizeLessons(e.target.value));
   [$("#lessonRows"), $("#lessonCards")].forEach(x => { x.addEventListener("click", updateLesson); x.addEventListener("input", updateLesson); });
   $("#annualHours").addEventListener("input", updateAnnualTotal); $("#exportWord").addEventListener("click", exportWord);
