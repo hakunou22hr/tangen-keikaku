@@ -28,11 +28,46 @@
       <div id="criteriaContent"></div>
     </section>
 
-    <section id="annual" class="panel" hidden>
-      <div class="section-heading"><div><p class="kicker">ANNUAL HOURS</p><h2>年間時数配分</h2></div><p>学校の教育課程に合わせて時数を調整できます。入力値は端末に保存されます。</p></div>
-      <div class="notice"><strong>数学Ⅰ 標準単位数：3単位</strong><span>下表は年間105時間を想定した編集可能な配分例です。</span></div>
-      <div class="hours-grid" id="annualHours"></div>
-      <div class="hours-total"><span>年間合計</span><strong id="annualTotal">0</strong><small>時間</small></div>
+    <section id="annual" class="panel annual-panel" hidden>
+      <div class="section-heading"><div><p class="kicker">ANNUAL HOURS</p><h2>年間時数配分</h2></div><p>各月の授業可能日数から、実働時数の見込みと年間指導計画上の配当時数を計算します。</p></div>
+
+      <section class="annual-step">
+        <div class="annual-step__heading"><span>01</span><div><h3>基本設定</h3><p>科目と授業時数を設定してください。</p></div></div>
+        <div class="annual-basic-grid">
+          <label>科目名<input id="annualSubjectName" placeholder="例：数学Ⅰ"></label>
+          <label>単位数<input id="annualCredits" type="number" min="0" max="10" step="1" inputmode="numeric"></label>
+          <label>標準年間時数<div class="annual-readonly"><strong id="annualStandardHours">0時間</strong><small>単位数 × 35 単位時間</small></div></label>
+          <label>週授業時数<input id="annualWeeklyHours" type="number" min="0" max="20" step="0.5" inputmode="decimal"></label>
+        </div>
+      </section>
+
+      <section class="annual-step">
+        <div class="annual-step__heading"><span>02</span><div><h3>月別授業可能日数</h3><p>4月から3月まで、実際に授業を設定できる日数を入力してください。</p></div></div>
+        <div id="annualMonthInputs" class="annual-month-grid"></div>
+        <div class="annual-formula-note">曜日が未確定の段階では、実働見込みを「授業可能日数 × 週授業時数 ÷ 5」で概算します。</div>
+      </section>
+
+      <section class="annual-step annual-results">
+        <div class="annual-step__heading"><span>03</span><div><h3>計算結果</h3><p>実働見込みは曜日未確定段階での概算です。</p></div></div>
+        <div class="annual-summary-grid">
+          <article><span>標準年間時数</span><strong id="annualSummaryStandard">0時間</strong></article>
+          <article><span>授業可能日数</span><strong id="annualSummaryDays">0日</strong></article>
+          <article class="accent"><span>実働見込み</span><strong id="annualSummaryEstimate">0.0時間</strong><small id="annualSummaryEstimateRound">（約0時間）</small></article>
+          <article><span>年計上の配当</span><strong id="annualSummaryAllocation">0 / 0時間</strong></article>
+        </div>
+        <div class="annual-result-table-wrap">
+          <table class="annual-result-table">
+            <thead><tr><th>月</th><th>授業可能日</th><th>実働見込み</th><th>年計上の配当</th></tr></thead>
+            <tbody id="annualResultRows"></tbody>
+            <tfoot><tr><th>合計</th><th id="annualResultDaysTotal">0日</th><th id="annualResultEstimateTotal">0.0h</th><th id="annualResultAllocationTotal">0h</th></tr></tfoot>
+          </table>
+        </div>
+        <div class="annual-actions">
+          <button id="annualCopyAlloc" type="button" class="annual-action primary-secondary">月別配当をコピー</button>
+          <button id="annualCopySummary" type="button" class="annual-action">計算結果をまとめてコピー</button>
+          <button id="annualReset" type="button" class="annual-action quiet">入力をリセット</button>
+        </div>
+      </section>
     </section>
 
     <section id="plan" class="panel active">
@@ -55,7 +90,7 @@
     </section>
   </main>
   <template id="criteriaTemplate"><article class="criteria-block"><h3></h3><p></p></article></template>
-  <script src="annual-hours.js?v=20260929-3"></script>
-  <script src="script.js?v=20260929-3"></script>
+  <script src="annual-hours.js?v=20260929-4"></script>
+  <script src="script.js?v=20260929-4"></script>
 </body>
 </html>
