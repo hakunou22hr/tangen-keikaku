@@ -83,8 +83,8 @@ function syncBasics() {
   model.teacherName = $("#teacherName").value;
   model.hours = Number($("#hours").value);
 }
-function fillSelect(select, values, selected, disabledAfterFirst = false) {
-  select.innerHTML = values.map((v, i) => `<option ${v === selected ? "selected" : ""} ${disabledAfterFirst && i > 0 ? "disabled" : ""}>${v}</option>`).join("");
+function fillSelect(select, values, selected) {
+  select.innerHTML = values.map(v => `<option value="${v}" ${v === selected ? "selected" : ""}>${v}</option>`).join("");
 }
 function renderAutoContent(target, subject, unit) {
   const data = UNITS[subject]?.[unit];
