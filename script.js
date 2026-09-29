@@ -157,7 +157,7 @@ async function exportWord() {
     const files = await readZip(await response.arrayBuffer());
     let xml = normalizeTemplateTags(new TextDecoder().decode(files["word/document.xml"]));
     const values = { affiliation: model.affiliation, teacherName: model.teacherName, unit: `${model.subject}　${model.unit}`, goal1: data.goals[0], goal2: data.goals[1], goal3: data.goals[2], criteriaKnowledge: data.criteria[0], criteriaThinking: data.criteria[1], criteriaAttitude: data.criteria[2] };
-    const tableRows = xml.match(/<w:tr(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:tr>/g) || [];
+    const tableRows = xml.match(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g) || [];
     const loopRow = tableRows.find(row => row.includes("{#lessons}") && row.includes("{/lessons}"));
     if (!loopRow) throw new Error("テンプレートの授業行タグが見つかりません。");
     const lessonRow = loopRow.replace("{#lessons}", "").replace("{/lessons}", "");
@@ -170,8 +170,8 @@ async function exportWord() {
 }
 const TEMPLATE_TAGS = ["#lessons", "/lessons", "hour", "activity", "knowledge", "thinking", "attitude", "method", "affiliation", "teacherName", "unit", "goal1", "goal2", "goal3", "criteriaKnowledge", "criteriaThinking", "criteriaAttitude"].map(tag => `{${tag}}`);
 function normalizeTemplateTags(xml) {
-  return xml.replace(/<w:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/w:p>/g, paragraph => {
-    const textPattern = /(<w:t(?:\\s[^>]*)?>)([\\s\\S]*?)(<\\/w:t>)/g;
+  return xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
+    const textPattern = /(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g;
     const nodes = [...paragraph.matchAll(textPattern)].map(match => ({ open: match[1], text: match[2], close: match[3] }));
     if (nodes.length < 2) return paragraph;
     for (const tag of TEMPLATE_TAGS) {
