@@ -352,17 +352,142 @@ function updateLesson(event) {
   }
   saveModel();
 }
+const ANNUAL_MONTHS = ["4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "1月", "2月", "3月"];
+const ANNUAL_STORAGE_KEY = "math-annual-planner:v2";
+
+function defaultAnnualPlanner() {
+  return {
+    subjectName: "数学Ⅰ",
+    credits: 3,
+    weeklyHours: 3,
+    days: Object.fromEntries(ANNUAL_MONTHS.map(month => [month, 0]))
+  };
+}
+function loadAnnualPlanner() {
+  const defaults = defaultAnnualPlanner();
+  try {
+    const saved = JSON.parse(localStorage.getItem(ANNUAL_STORAGE_KEY) || "{}");
+    return {
+      ...defaults,
+      ...saved,
+      days: { ...defaults.days, ...(saved.days || {}) }
+    };
+  } catch {
+    return defaults;
+  }
+}
+function saveAnnualPlanner() {
+  const data = {
+    subjectName: $("#annualSubjectName").value.trim(),
+    credits: Number($("#annualCredits").value) || 0,
+    weeklyHours: Number($("#annualWeeklyHours").value) || 0,
+    days: Object.fromEntries(ANNUAL_MONTHS.map(month => {
+      const input = document.querySelector(`[data-annual-month="${month}"]`);
+      return [month, Math.max(0, Number(input?.value) || 0)];
+    }))
+  };
+  localStorage.setItem(ANNUAL_STORAGE_KEY, JSON.stringify(data));
+  return data;
+}
+function allocateAnnualHours(monthEstimates, standardHours) {
+  const totalEstimate = monthEstimates.reduce((sum, value) => sum + value, 0);
+  if (standardHours <= 0 || totalEstimate <= 0) return monthEstimates.map(() => 0);
+  const raw = monthEstimates.map(value => value / totalEstimate * standardHours);
+  const allocation = raw.map(Math.floor);
+  let remaining = Math.max(0, standardHours - allocation.reduce((sum, value) => sum + value, 0));
+  raw
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index)
+    .slice(0, remaining)
+    .forEach(({ index }) => { allocation[index] += 1; });
+  return allocation;
+}
+function calculateAnnualPlanner(data) {
+  const standardHours = Math.max(0, Math.round(data.credits * 35));
+  const days = ANNUAL_MONTHS.map(month => Math.max(0, Number(data.days[month]) || 0));
+  const estimates = days.map(value => value * data.weeklyHours / 5);
+  const allocations = allocateAnnualHours(estimates, standardHours);
+  return {
+    standardHours,
+    days,
+    estimates,
+    allocations,
+    totalDays: days.reduce((sum, value) => sum + value, 0),
+    totalEstimate: estimates.reduce((sum, value) => sum + value, 0),
+    totalAllocation: allocations.reduce((sum, value) => sum + value, 0)
+  };
+}
 function renderAnnual() {
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem("math-annual-hours:v1") || "{}"); } catch { saved = {}; }
-  $("#annualHours").innerHTML = ANNUAL_HOURS["数学Ⅰ"].map((x, i) => `<label><span><b>${String(i + 1).padStart(2,"0")}</b>${x.unit}</span><span class="number-field"><input type="number" min="0" data-unit="${x.unit}" value="${saved[x.unit] ?? x.hours}"><small>時間</small></span></label>`).join("");
-  updateAnnualTotal();
+  const data = loadAnnualPlanner();
+  $("#annualSubjectName").value = data.subjectName;
+  $("#annualCredits").value = data.credits;
+  $("#annualWeeklyHours").value = data.weeklyHours;
+  $("#annualMonthInputs").innerHTML = ANNUAL_MONTHS.map(month => `
+    <label class="annual-month-input">
+      <span>${month}</span>
+      <div><input type="number" min="0" max="31" step="1" inputmode="numeric" data-annual-month="${month}" value="${data.days[month] ?? 0}"><small>日</small></div>
+    </label>`).join("");
+  updateAnnualPlanner(false);
 }
-function updateAnnualTotal() {
-  const data = {}; let total = 0;
-  document.querySelectorAll("#annualHours input").forEach(x => { data[x.dataset.unit] = Number(x.value); total += Number(x.value); });
-  $("#annualTotal").textContent = total; localStorage.setItem("math-annual-hours:v1", JSON.stringify(data));
+function updateAnnualPlanner(persist = true) {
+  const data = persist ? saveAnnualPlanner() : loadAnnualPlanner();
+  const result = calculateAnnualPlanner(data);
+  $("#annualStandardHours").textContent = `${result.standardHours}時間`;
+  $("#annualSummaryStandard").textContent = `${result.standardHours}時間`;
+  $("#annualSummaryDays").textContent = `${result.totalDays}日`;
+  $("#annualSummaryEstimate").textContent = `${result.totalEstimate.toFixed(1)}時間`;
+  $("#annualSummaryEstimateRound").textContent = `（約${Math.round(result.totalEstimate)}時間）`;
+  $("#annualSummaryAllocation").textContent = `${result.totalAllocation} / ${result.standardHours}時間`;
+  $("#annualResultRows").innerHTML = ANNUAL_MONTHS.map((month, index) => `
+    <tr>
+      <th>${month}</th>
+      <td>${result.days[index]}日</td>
+      <td>${result.estimates[index].toFixed(1)}h</td>
+      <td><strong>${result.allocations[index]}h</strong></td>
+    </tr>`).join("");
+  $("#annualResultDaysTotal").textContent = `${result.totalDays}日`;
+  $("#annualResultEstimateTotal").textContent = `${result.totalEstimate.toFixed(1)}h`;
+  $("#annualResultAllocationTotal").textContent = `${result.totalAllocation}h`;
 }
+async function copyText(text, successMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    alert(successMessage);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove();
+    alert(successMessage);
+  }
+}
+function annualCopyAllocation() {
+  const data = saveAnnualPlanner();
+  const result = calculateAnnualPlanner(data);
+  const text = ANNUAL_MONTHS.map((month, index) => `${month}\t${result.allocations[index]}時間`).join("\n");
+  copyText(text, "月別配当をコピーしました。");
+}
+function annualCopySummary() {
+  const data = saveAnnualPlanner();
+  const result = calculateAnnualPlanner(data);
+  const lines = [
+    `科目名：${data.subjectName || "未入力"}`,
+    `単位数：${data.credits}`,
+    `標準年間時数：${result.standardHours}時間`,
+    `週授業時数：${data.weeklyHours}`,
+    `授業可能日数：${result.totalDays}日`,
+    `実働見込み：${result.totalEstimate.toFixed(1)}時間（約${Math.round(result.totalEstimate)}時間）`,
+    `年計上の配当：${result.totalAllocation} / ${result.standardHours}時間`,
+    "",
+    "月\t授業可能日\t実働見込み\t年計上の配当",
+    ...ANNUAL_MONTHS.map((month, index) => `${month}\t${result.days[index]}日\t${result.estimates[index].toFixed(1)}h\t${result.allocations[index]}h`)
+  ];
+  copyText(lines.join("\n"), "計算結果をまとめてコピーしました。");
+}
+function resetAnnualPlanner() {
+  if (!confirm("年間時数配分の入力を初期値に戻しますか？")) return;
+  localStorage.removeItem(ANNUAL_STORAGE_KEY);
+  renderAnnual();
+}
+
 async function exportWord() {
   const button = $("#exportWord"); button.disabled = true; button.querySelector("span").textContent = "作成中…";
   try {
@@ -464,6 +589,6 @@ function init() {
   $("#criteriaSubject").addEventListener("change", () => { const subject = $("#criteriaSubject").value; const units = Object.keys(UNITS[subject] || {}); fillSelect($("#criteriaUnit"), units.length ? units : ["準備中"], units[0] || "準備中"); renderCriteria(); }); $("#criteriaUnit").addEventListener("change", renderCriteria);
   ["#affiliation", "#teacherName"].forEach(id => $(id).addEventListener("input", saveModel)); $("#hours").addEventListener("change", e => resizeLessons(e.target.value));
   [$("#lessonRows"), $("#lessonCards")].forEach(x => { x.addEventListener("click", updateLesson); x.addEventListener("input", updateLesson); });
-  $("#annualHours").addEventListener("input", updateAnnualTotal); $("#exportWord").addEventListener("click", exportWord);
+  $("#annual").addEventListener("input", () => updateAnnualPlanner(true)); $("#annualCopyAlloc").addEventListener("click", annualCopyAllocation); $("#annualCopySummary").addEventListener("click", annualCopySummary); $("#annualReset").addEventListener("click", resetAnnualPlanner); $("#exportWord").addEventListener("click", exportWord);
 }
 document.addEventListener("DOMContentLoaded", init);
